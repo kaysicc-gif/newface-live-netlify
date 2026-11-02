@@ -1,6 +1,6 @@
 # NewFace Live — browser-only online models
 
-NewFace Live is a static web application for Chrome and Edge. It fetches model assets from the configured online GitHub Release through a same-origin Netlify Edge Function and runs ONNX inference in the browser. It does not upload camera frames to a cloud inference server and does not persist model files in IndexedDB or deliberately cache them through the Fetch API.
+NewFace Live is a static web application for Chrome and Edge. It fetches model assets from the configured online GitHub Release through a same-origin Netlify Edge Function and runs ONNX inference in the browser. It does not upload camera frames to a cloud inference server. Downloaded model bytes are saved in IndexedDB for reuse when browser storage permits; the Fetch API cache is not used for model persistence.
 
 ## Important performance note
 
@@ -16,7 +16,7 @@ The online release must contain these exact assets under the `models-v1` tag in 
 - `bisenet_resnet_34.onnx` — face-region parsing
 - `emap.bin` — embedding mapping data
 
-The model files are not bundled into this source ZIP. The website fetches them from online hosting at runtime. The browser must receive the model bytes to run inference, so network data is temporarily held in browser memory. This package does not write those bytes to IndexedDB or offer model-file downloads.
+The model files are not bundled into this source ZIP. The website fetches them from online hosting at runtime. The browser must receive model bytes to run inference. After a successful download, the app attempts to save each model in IndexedDB so later visits can reuse it. Cache entries are keyed by model URL and cache version. Browser storage limits, private-browsing settings, or storage pressure may prevent or remove the saved copies; the app then downloads missing models again.
 
 ## Deploy to Netlify
 
@@ -39,13 +39,15 @@ The website can also be served through `RUN-NEWFACE.bat` at `http://localhost:80
 
 - Camera frames are processed in the browser by the app's ONNX pipeline.
 - The camera is requested only after you press Start camera.
-- Model assets are fetched with `cache: no-store` and are not saved to IndexedDB by this app. Browser/OS memory management is outside the app's direct control.
-- A browser may retain network artifacts according to its own implementation; the app does not explicitly persist model files.
+- Missing model assets are fetched with `cache: no-store` and then saved in IndexedDB when browser storage permits.
+- The app requests persistent browser storage where supported, but the browser may deny the request or later clear data.
+- Camera frames remain in the browser pipeline and are not sent to a cloud inference server.
 - Use reference images only with appropriate permission and consent.
 
 ## Current features
 
 - Online model fetch with progress and actionable HTTP errors
+- IndexedDB model cache with cache-first loading and download fallback
 - WebGPU-first / WASM CPU fallback attempt
 - Camera start/stop, reference photo upload, face swapping
 - Full-face and selected facial-region modes

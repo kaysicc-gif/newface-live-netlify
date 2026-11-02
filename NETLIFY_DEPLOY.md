@@ -1,10 +1,10 @@
 # Fresh deployment — GitHub + Netlify
 
-This walkthrough uses the website repository `kaysicc-gif/newface-live-fresh` and the separate model repository `kaysicc-gif/newface-models`. Do not mix their contents.
+This walkthrough uses the website repository `kaysicc-gif/newface-live-netlify` and the separate model repository `kaysicc-gif/newface-models`. Do not mix their contents.
 
 ## 1. Prepare the GitHub website repository
 
-1. Open GitHub and create a **new public repository** named `newface-live-fresh`. If you already created that repository, use it rather than creating a duplicate.
+1. Open GitHub and create a **new public repository** named `newface-live-netlify`. If you already created that repository, use it rather than creating a duplicate.
 2. Do not initialize the repository with an extra README, license, or `.gitignore`.
 3. Extract this ZIP on your computer. Open the extracted `NewFace-Live-FRESH-START-GitHub` folder.
 4. Upload the **contents of the folder** to the repository root, not the ZIP file by itself. The root must contain `public/`, `netlify/`, `netlify.toml`, `MODEL_SOURCE.json`, `README.md`, and `NETLIFY_DEPLOY.md`.
@@ -13,7 +13,7 @@ This walkthrough uses the website repository `kaysicc-gif/newface-live-fresh` an
 ## 2. Create/connect the Netlify website
 
 1. Sign in at https://app.netlify.com/ and choose **Add new project → Import an existing project** (wording may vary).
-2. Choose GitHub and select **`kaysicc-gif/newface-live-fresh`**. Do not select `newface-models` for the website deployment.
+2. Choose GitHub and select **`kaysicc-gif/newface-live-netlify`**. Do not select `newface-models` for the website deployment.
 3. In build settings, clear any manual **Build command** and **Publish directory** values so they are blank and the repository's `netlify.toml` is used. In particular, never type a sentence such as `Follow the repository's netlify.toml` into a command field.
 4. Deploy the site. The configuration file sets `publish = "public"` and the Edge Function directory.
 
@@ -42,3 +42,7 @@ A successful page load or model download does not prove the AI pipeline works. C
 ## Keep the model repo separate
 
 The website repo contains the frontend and proxy only. The large model binaries stay in the public `kaysicc-gif/newface-models` release.
+
+## Browser model storage
+
+The app saves downloaded model bytes in IndexedDB under the `newface-live-models` database. It attempts to request persistent storage where supported. Browser quotas, private mode, or storage pressure may prevent or remove cache entries; missing models are fetched again. The five models total roughly 563 MB, so ensure sufficient free storage. To force a refresh after changing model assets without changing their URLs, increment `CACHE_VERSION` in `public/js/models.js` and redeploy.

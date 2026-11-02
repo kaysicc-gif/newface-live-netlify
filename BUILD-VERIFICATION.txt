@@ -14,7 +14,9 @@ Validation performed for this package:
 - Static checks do not prove the release assets exist, the live site deploys, the FP16 model initializes, or real-time speed on the user's laptop.
 
 Runtime strategy:
-- Fetch model data online using Fetch cache: no-store.
-- Do not persist model bytes in IndexedDB.
+- Check IndexedDB before requesting each model.
+- Fetch missing model data online using Fetch cache: no-store, then persist it in IndexedDB when browser storage permits.
+- Request persistent browser storage where supported; this request may be denied and cache entries are never guaranteed permanent.
+- Model cache keys include a cache version and the model URL. Increment CACHE_VERSION in public/js/models.js when model assets change in place.
 - Try WebGPU when available; fall back to WASM CPU if session creation fails.
 - The InSwapper FP16 model may be unsupported by some browser backends. Real-device testing is required.
