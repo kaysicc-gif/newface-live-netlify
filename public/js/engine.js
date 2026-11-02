@@ -1,0 +1,30 @@
+import {loadSession,loadSessionWasm,loadEmap,fetchModelBytes,totalModelSize,getLastSessionBackend} from "./models.js";
+import {detectOneFace,alignFace,extractEmbedding,projectEmbedding,runSwap,pasteBack,parseFullFrame,createRegionMask,blendRegion,sharpen} from "./pipeline.js";
+export class Engine{
+ constructor(){this.detSession=this.recSession=this.swapSession=this.parseSession=null;this.emap=null;this.worker=null;this.workerReady=false;this.workerBusy=false;this.latest=null;this.latestTime=0;this.gen=0;this.ready=false;this.sourceLatent=null;this.setting=false;this.processing=false;this.region="full";this.opacity=.7;this.sharpness=50;this.mirror=true;this.parsing=null;this.parseCount=0;this.fps=0;this.times=[];this.backend="initializing";this.lastError="";this.regionFeatures=true;}
+ async init(cb){
+  const sizes={det_10g:0,w600k_r50:0,inswapper:0,bisenet:0,emap:0},total=totalModelSize();
+  const p=(name,loaded,expected)=>{sizes[name]=loaded;cb?.(name,loaded,expected||loaded,Object.values(sizes).reduce((a,b)=>a+b,0)/total);};
+  // Detection runs in a dedicated worker. Avoid creating a second, unused detector session.
+  const det=await fetchModelBytes("det_10g",p);
+  this.worker=new Worker("./js/detection-worker.js");
+  await new Promise((res,rej)=>{let settled=false;const timer=setTimeout(()=>{if(!settled){settled=true;rej(new Error("Face-detection worker did not initialize. Check that ONNX Runtime can load from the CDN."));}},90000);this.worker.onmessage=e=>{if(e.data.type==="ready"){this.workerReady=true;if(!settled){settled=true;clearTimeout(timer);res();}}else if(e.data.type==="result"){this.workerBusy=false;if(e.data.gen===this.gen){if(e.data.face){this.latest=e.data.face;this.latestTime=performance.now();}else this.latest=null;}}else if(e.data.type==="error"&&!this.workerReady){if(!settled){settled=true;clearTimeout(timer);rej(Error(e.data.message));}}};this.worker.onerror=e=>{if(!settled){settled=true;clearTimeout(timer);rej(new Error(e.message||"Detection worker failed"));}};const copy=det.slice(0);this.worker.postMessage({type:"init",modelBytes:copy},[copy]);});
+  // The detector worker handles live frames; this lightweight second session detects the uploaded reference face.
+  this.detSession=await ort.InferenceSession.create(det,{executionProviders:["wasm"],graphOptimizationLevel:"all",enableCpuMemArena:true,enableMemPattern:true,logSeverityLevel:3});
+  this.recSession=await loadSessionWasm("w600k_r50",p);this.recBackend=getLastSessionBackend();
+  this.swapSession=await loadSession("inswapper",p);this.swapBackend=getLastSessionBackend();
+  try{this.parseSession=await loadSession("bisenet",p);this.parseBackend=getLastSessionBackend();}catch(e){this.parseSession=null;this.regionFeatures=false;this.lastError=`Facial-region parsing is unavailable in this browser: ${e.message||e}`;console.warn(this.lastError);}
+  this.emap=await loadEmap(p);
+  this.backend=`Swap: ${this.swapBackend}; recognition: ${this.recBackend}; regions: ${this.parseSession?this.parseBackend:"unavailable"}`;
+  // Warm-up catches unsupported operators/input mismatch before camera startup.
+  const targetName=this.swapSession.inputNames[0],sourceName=this.swapSession.inputNames[1];
+  try{await this.swapSession.run({[targetName]:new ort.Tensor("float32",new Float32Array(3*128*128),[1,3,128,128]),[sourceName]:new ort.Tensor("float32",new Float32Array(512),[1,512])},{logSeverityLevel:3});}catch(e){console.warn("InSwapper warm-up did not complete; first frame will test inference:",e);}
+  this.ready=true;
+ }
+ async setReference(source){if(!this.ready)return false;this.setting=true;try{let img=source;if(typeof source==="string"){img=new Image();img.crossOrigin="anonymous";await new Promise((r,j)=>{img.onload=r;img.onerror=j;img.src=source;});}const c=new OffscreenCanvas(img.naturalWidth||img.width,img.naturalHeight||img.height),x=c.getContext("2d");x.drawImage(img,0,0);const d=x.getImageData(0,0,c.width,c.height),f=await detectOneFace(this.detSession,d);if(!f)throw Error("No face found in reference image");const a=alignFace(d.data,d.width,d.height,f.kps,112);this.sourceLatent=projectEmbedding(await extractEmbedding(this.recSession,a.data),this.emap);this.gen++;this.latest=null;this.parsing=null;this.parseCount=0;return true;}finally{this.setting=false;}}
+ async processFrame(frame){if(!this.ready||!this.sourceLatent||this.setting||this.processing)return null;this.processing=true;try{if(this.workerReady&&!this.workerBusy){this.workerBusy=true;const px=frame.data.buffer.slice(0);this.worker.postMessage({type:"detect",pixels:px,width:frame.width,height:frame.height,id:0,gen:this.gen},[px]);}
+ let f=this.latest;if(!f)return null;const a=alignFace(frame.data,frame.width,frame.height,f.kps,128),sw=await runSwap(this.swapSession,a.data,this.sourceLatent);let swapped=pasteBack(frame.data,frame.width,frame.height,sw,a.M,new Uint8ClampedArray(frame.data.length));
+ if(this.region!=="full"&&this.parseSession){if(!this.parsing||this.parseCount++%45===0)this.parsing=await parseFullFrame(this.parseSession,frame,f.bbox);const mask=createRegionMask(this.parsing,this.region,f.kps,frame.width,frame.height);swapped=blendRegion(frame.data,swapped,mask,this.opacity,frame.width,frame.height,new Uint8ClampedArray(frame.data.length));}else swapped=blendRegion(frame.data,swapped,null,this.opacity,frame.width,frame.height,new Uint8ClampedArray(frame.data.length));
+ if(this.sharpness>0)swapped=sharpen(swapped,frame.width,frame.height,this.sharpness);const now=performance.now();this.times.push(now);while(this.times[0]<now-1000)this.times.shift();this.fps=this.times.length;return new ImageData(swapped,frame.width,frame.height);}finally{this.processing=false;}}
+ destroy(){this.worker?.terminate();}
+}

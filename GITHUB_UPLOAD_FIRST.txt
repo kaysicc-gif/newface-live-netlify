@@ -1,0 +1,12 @@
+GITHUB UPLOAD CHECKLIST
+
+Upload the CONTENTS of this extracted folder to the root of your GitHub repository (not the ZIP itself).
+Keep these paths at the repository root:
+  public/
+  netlify/
+  netlify.toml
+  README.md
+  MODEL_SOURCE.json
+
+For local UI preview, use RUN-NEWFACE.bat. Full model loading uses the deployed Netlify /models-cdn/ proxy; do not place model binaries in the website folder.
+Do not upload large ONNX binaries to the website repository; GitHub has file-size limits.

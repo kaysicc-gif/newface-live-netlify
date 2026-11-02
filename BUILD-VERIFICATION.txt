@@ -1,0 +1,20 @@
+NewFace Live — Build and validation notes
+
+Package: static browser application + Netlify Edge Function.
+Publish directory: public.
+Build command: none required.
+Online model endpoint: /models-cdn/<asset>.
+Model source: kaysicc-gif/newface-models, release tag models-v1.
+Required Netlify environment variables: MODEL_OWNER, MODEL_REPO, MODEL_TAG.
+
+Validation performed for this package:
+- JavaScript syntax checked for models.js, engine.js, pipeline.js, and models-proxy.js.
+- Confirmed required frontend files and Netlify configuration are included.
+- Model binaries are intentionally excluded from the website ZIP and must exist as release assets.
+- Static checks do not prove the release assets exist, the live site deploys, the FP16 model initializes, or real-time speed on the user's laptop.
+
+Runtime strategy:
+- Fetch model data online using Fetch cache: no-store.
+- Do not persist model bytes in IndexedDB.
+- Try WebGPU when available; fall back to WASM CPU if session creation fails.
+- The InSwapper FP16 model may be unsupported by some browser backends. Real-device testing is required.

@@ -1,0 +1,9 @@
+NEWFACE LIVE — WINDOWS BROWSER PREVIEW
+
+Recommended: deploy to Netlify and open the resulting HTTPS website in Chrome or Edge. The deployed site uses its Netlify Edge Function to fetch the five models online. Do NOT copy ONNX model files into your PC or website folder.
+
+For a local UI preview, extract the ZIP, install Python 3 if needed, run RUN-NEWFACE.bat and open http://localhost:8080. Model loading will not work in this local preview unless you also provide a /models-cdn/ proxy; use the deployed Netlify URL for full online model testing.
+
+In the deployed site: press Get Started, wait for online model loading, upload a reference photo containing a face, then start the camera. Start with Fast processing quality.
+
+Browser-only inference is attempted with WebGPU first and WASM CPU fallback. The Intel HD Graphics 3000 may not support WebGPU, and the FP16 face-swap model may not run on the WASM backend. On this older laptop, real-time speed is not guaranteed.

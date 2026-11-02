@@ -1,0 +1,12 @@
+{
+  "repository": "kaysicc-gif/newface-models",
+  "release_tag": "models-v1",
+  "assets": {
+    "det_10g.onnx": "det_10g.onnx",
+    "w600k_r50.onnx": "w600k_r50.onnx",
+    "inswapper_128_fp16.onnx": "inswapper_128_fp16.onnx",
+    "bisenet_resnet_34.onnx": "bisenet_resnet_34.onnx",
+    "emap.bin": "emap.bin"
+  },
+  "note": "FP16 model aliasing is a filename mapping only. Verify runtime and EMAP compatibility before production."
+}

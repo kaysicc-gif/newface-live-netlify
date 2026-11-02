@@ -1,0 +1,1 @@
+No model files are bundled or required in this folder. The deployed website fetches models online from /models-cdn/ through the Netlify Edge Function. Do not add the model binaries to the website repository. Model bytes are fetched with cache: no-store and are not persisted in IndexedDB by this app.
