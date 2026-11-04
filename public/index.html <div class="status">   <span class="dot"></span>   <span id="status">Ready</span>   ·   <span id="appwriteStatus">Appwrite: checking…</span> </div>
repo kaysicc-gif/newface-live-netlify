@@ -28,7 +28,12 @@ const _warn=console.warn.bind(console);console.warn=(...a)=>{if(typeof a[0]==="s
 <button class="btn primary" id="launch" style="margin-top:18px">Get Started</button><div class="error" id="loadError"></div>
 </div></div>
 <div class="shell">
-<header class="top"><div class="logo">NEW<b>FACE</b> LIVE</div><div class="status"><span class="dot"></span><span id="status">Ready</span></div></header>
+<header class="top"><div class="logo">NEW<b>FACE</b> LIVE</div><div class="status">
+  <span class="dot"></span>
+  <span id="status">Ready</span>
+  ·
+  <span id="appwriteStatus">Appwrite: checking…</span>
+</div></header>
 <main class="main">
 <section class="stage" id="stage"><video id="video" playsinline muted></video><canvas id="canvas"></canvas><div class="overlay" id="overlay">Idle</div></section>
 <aside class="panel">
