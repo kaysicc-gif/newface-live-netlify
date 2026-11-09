@@ -65,11 +65,12 @@ export async function fetchModelBytes(name,cb){
   const url=base+m.file;
   try{
     const cached=asArrayBuffer(await readCachedModel(name,url));
-    if(cached&&cached.byteLength>0){
+    if(cached&&cached.byteLength===m.size){
       cb?.(name,cached.byteLength,cached.byteLength);
       console.info(`Loaded ${name} from browser storage cache.`);
       return cached;
     }
+    if(cached){console.warn(`Discarding incomplete cached model ${name}: expected ${m.size} bytes, found ${cached.byteLength}.`);await deleteCachedModel(name,url);}
   }catch(e){console.warn(`Browser model cache read failed for ${name}; downloading instead.`,e);}
 
   let r;
@@ -85,6 +86,7 @@ export async function fetchModelBytes(name,cb){
     const out=new Uint8Array(loaded);let off=0;for(const c of chunks){out.set(c,off);off+=c.byteLength;}bytes=out.buffer;
   }
   if(!bytes||!bytes.byteLength)throw new Error(`The downloaded model ${name} is empty.`);
+  if(bytes.byteLength!==m.size)throw new Error(`The downloaded model ${name} is incomplete: expected ${m.size} bytes, received ${bytes.byteLength}. Please retry the download.`);
   try{await saveCachedModel(name,url,bytes);console.info(`Saved ${name} (${bytes.byteLength} bytes) in browser storage.`);}
   catch(e){console.warn(`Could not persist ${name} in browser storage. The model can still run for this session.`,e);}
   cb?.(name,bytes.byteLength,bytes.byteLength);
@@ -94,7 +96,19 @@ export async function fetchModelBytes(name,cb){
 export async function loadSessionWasm(name,cb){
   const bytes=await fetchModelBytes(name,cb);
   try{const session=await ort.InferenceSession.create(bytes,{executionProviders:["wasm"],graphOptimizationLevel:"all",enableCpuMemArena:true,enableMemPattern:true,logSeverityLevel:3});lastSessionBackend="WASM CPU";return session;}
-  catch(e){throw new Error(`${name} could not initialize with the browser WASM CPU backend. This model may require operators or FP16 support not available in this browser runtime. Details: ${e.message||e}`);}
+  catch(e){
+    const diagnostics=[
+      `Browser: ${navigator.userAgent||"unknown"}`,
+      `Device memory: ${navigator.deviceMemory??"not reported"} GiB`,
+      `CPU threads: ${navigator.hardwareConcurrency??"not reported"}`,
+      `ONNX Runtime: ${ort.version??"unknown"}`,
+      `WASM SIMD: ${ort.env?.wasm?.simd??"not reported"}`,
+      `Cross-origin isolated: ${globalThis.crossOriginIsolated??"not reported"}`,
+      `Model bytes: ${bytes.byteLength}`,
+      `Original error: ${e?.stack||e?.message||String(e)}`
+    ].join("\n");
+    throw new Error(`${name} could not initialize with the browser WASM CPU backend.\n\nDevice diagnostics:\n${diagnostics}`);
+  }
 }
 export async function loadSession(name,cb){
   const bytes=await fetchModelBytes(name,cb);const errors=[];

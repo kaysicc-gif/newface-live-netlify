@@ -1,0 +1,83 @@
+name: Validate NewFace Live
+on:
+  push:
+    branches: ["main", "fix/**"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  static-and-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module --check < public/js/engine.js
+          node --input-type=module --check < public/js/models.js
+          node --input-type=module --check < public/js/pipeline.js
+          node --check public/js/detection-worker.js
+          node --input-type=module --check < netlify/edge-functions/models-proxy.js
+      - name: Check required app files and model registry
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path(".")
+          required = [
+              "public/index.html", "public/js/engine.js", "public/js/models.js",
+              "public/js/pipeline.js", "public/js/detection-worker.js",
+              "netlify/edge-functions/models-proxy.js", "netlify.toml"
+          ]
+          missing = [p for p in required if not (root / p).is_file()]
+          if missing:
+              raise SystemExit("Missing required files: " + ", ".join(missing))
+          models = (root / "public/js/models.js").read_text()
+          expected = {
+              "det_10g.onnx": 16923827,
+              "w600k_r50.onnx": 174383860,
+              "inswapper_128_fp16.onnx": 277288649,
+              "bisenet_resnet_34.onnx": 93632546,
+              "emap.bin": 1048576,
+          }
+          for filename, size in expected.items():
+              if not re.search(re.escape(filename) + r'"\s*,\s*size\s*:\s*' + str(size), models):
+                  raise SystemExit(f"Model registry mismatch or missing entry: {filename}")
+          html = (root / "public/index.html").read_text()
+          for asset in ("./js/engine.js", "./js/models.js"):
+              if asset not in html:
+                  raise SystemExit(f"App entry is missing {asset}")
+          print("Required files and model registry checks passed.")
+          PY
+      - name: Verify public model release assets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          url = "https://api.github.com/repos/kaysicc-gif/newface-models/releases/tags/models-v1"
+          req = urllib.request.Request(url, headers={"Accept":"application/vnd.github+json","User-Agent":"newface-live-ci"})
+          with urllib.request.urlopen(req, timeout=30) as response:
+              release = json.load(response)
+          actual = {a["name"]: a["size"] for a in release.get("assets", [])}
+          expected = {
+              "det_10g.onnx": 16923827,
+              "w600k_r50.onnx": 174383860,
+              "inswapper_128_fp16.onnx": 277288649,
+              "bisenet_resnet_34.onnx": 93632546,
+              "emap.bin": 1048576,
+              "SHA256SUMS.txt": 414,
+          }
+          errors = [f"{name}: expected {size}, got {actual.get(name)}"
+                    for name, size in expected.items() if actual.get(name) != size]
+          if errors:
+              raise SystemExit("\\n".join(errors))
+          print("All six model release assets exist and match expected byte sizes.")
+          PY
