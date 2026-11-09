@@ -1,9 +1,9 @@
-import {loadSession,loadSessionWasm,loadEmap,fetchModelBytes,totalModelSize,getLastSessionBackend} from "./models.js";
+import {loadSession,loadSessionWasm,loadEmap,fetchModelBytes,modelRegistry,getLastSessionBackend} from "./models.js";
 import {detectOneFace,alignFace,extractEmbedding,projectEmbedding,runSwap,pasteBack,parseFullFrame,createRegionMask,blendRegion,sharpen} from "./pipeline.js";
 export class Engine{
  constructor(){this.detSession=this.recSession=this.swapSession=this.parseSession=null;this.emap=null;this.worker=null;this.workerReady=false;this.workerBusy=false;this.workerRequests=new Map();this.nextWorkerRequest=1;this.latest=null;this.latestTime=0;this.gen=0;this.ready=false;this.sourceLatent=null;this.setting=false;this.processing=false;this.region="full";this.opacity=.7;this.sharpness=50;this.mirror=true;this.parsing=null;this.parseCount=0;this.fps=0;this.times=[];this.backend="initializing";this.lastError="";this.regionFeatures=true;}
  async init(cb){
-  const sizes={det_10g:0,w600k_r50:0,inswapper:0,bisenet:0,emap:0},total=totalModelSize();
+  const sizes={det_10g:0,w600k_r50:0,inswapper:0,emap:0},total=modelRegistry().filter(m=>m.key!=="bisenet").reduce((sum,m)=>sum+m.size,0);
   const p=(name,loaded,expected)=>{sizes[name]=loaded;cb?.(name,loaded,expected||loaded,Object.values(sizes).reduce((a,b)=>a+b,0)/total);};
   // Keep the detector in one worker; reference-photo detection reuses that same session.
   const det=await fetchModelBytes("det_10g",p);
@@ -15,7 +15,7 @@ export class Engine{
   // Facial parsing is optional and is loaded only if the user selects a facial region.
   this.parseSession=null;this.regionFeatures=true;
   this.emap=await loadEmap(p);
-  this.backend=`Swap: ${this.swapBackend}; recognition: ${this.recBackend}; regions: ${this.parseSession?this.parseBackend:"unavailable"}`;
+  this.backend=`Swap: ${this.swapBackend}; recognition: ${this.recBackend}; regions: load on demand`;
   // Warm-up catches unsupported operators/input mismatch before camera startup.
   const targetName=this.swapSession.inputNames[0],sourceName=this.swapSession.inputNames[1];
   try{await this.swapSession.run({[targetName]:new ort.Tensor("float32",new Float32Array(3*128*128),[1,3,128,128]),[sourceName]:new ort.Tensor("float32",new Float32Array(512),[1,512])},{logSeverityLevel:3});}catch(e){console.warn("InSwapper warm-up did not complete; first frame will test inference:",e);}
