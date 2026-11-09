@@ -49,7 +49,7 @@ jobs:
               "emap.bin": 1048576,
           }
           for filename, size in expected.items():
-              if not re.search(re.escape(filename) + r'[^\\n]*size\\s*:\\s*' + str(size), models):
+              if not re.search(re.escape(filename) + r'"\\s*,\\s*size\\s*:\\s*' + str(size), models):
                   raise SystemExit(f"Model registry mismatch or missing entry: {filename}")
           html = (root / "public/index.html").read_text()
           for asset in ("./js/engine.js", "./js/models.js"):
