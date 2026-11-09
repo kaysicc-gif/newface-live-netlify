@@ -106,8 +106,8 @@ export async function loadSessionWasm(name,cb){
       `Cross-origin isolated: ${globalThis.crossOriginIsolated??"not reported"}`,
       `Model bytes: ${bytes.byteLength}`,
       `Original error: ${e?.stack||e?.message||String(e)}`
-    ].join("\\n");
-    throw new Error(`${name} could not initialize with the browser WASM CPU backend.\\n\\nDevice diagnostics:\\n${diagnostics}`);
+    ].join("\n");
+    throw new Error(`${name} could not initialize with the browser WASM CPU backend.\n\nDevice diagnostics:\n${diagnostics}`);
   }
 }
 export async function loadSession(name,cb){
